@@ -6,6 +6,7 @@ import { DocumentSnapshot } from '../models/DocumentSnapshot.js';
 import { ShareLink } from '../models/ShareLink.js';
 import { User } from '../models/User.js';
 import { roomManager } from '../collaboration/server.js';
+import { sendDocumentInvitationEmail } from '../services/emailService.js';
 
 export async function listDocuments(req, res, next) {
   try {
@@ -264,29 +265,75 @@ export async function addMember(req, res, next) {
       return res.status(400).json({ error: 'Role must be either editor or viewer.' });
     }
 
-    const targetUser = await User.findOne({ email: email.toLowerCase().trim() });
-    if (!targetUser) {
-      return res.status(404).json({ error: `No registered user found with email "${email}".` });
-    }
+    const normalizedEmail = email.toLowerCase().trim();
+    const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+    const inviterName = req.user.name;
+    const inviterEmail = req.user.email;
+    const documentTitle = doc.title;
 
-    if (targetUser._id.toString() === doc.ownerId.toString()) {
-      return res.status(400).json({ error: 'User is already the document owner.' });
-    }
+    const targetUser = await User.findOne({ email: normalizedEmail });
 
-    const membership = await DocumentMember.findOneAndUpdate(
-      { documentId: doc._id, userId: targetUser._id },
-      { role },
-      { upsert: true, new: true, setDefaultsOnInsert: true }
-    ).populate('userId', 'name email avatarColor');
-
-    return res.status(201).json({
-      message: `User ${targetUser.name} added as ${role}.`,
-      member: {
-        id: membership._id,
-        user: membership.userId,
-        role: membership.role
+    if (targetUser) {
+      if (targetUser._id.toString() === doc.ownerId.toString()) {
+        return res.status(400).json({ error: 'User is already the document owner.' });
       }
-    });
+
+      const membership = await DocumentMember.findOneAndUpdate(
+        { documentId: doc._id, userId: targetUser._id },
+        { role },
+        { upsert: true, new: true, setDefaultsOnInsert: true }
+      ).populate('userId', 'name email avatarColor');
+
+      // Dispatch real invitation email to registered user
+      const shareUrl = `${clientUrl}/document/${doc._id}`;
+      sendDocumentInvitationEmail({
+        toEmail: targetUser.email,
+        inviterName,
+        inviterEmail,
+        documentTitle,
+        role,
+        shareUrl
+      }).catch((err) => console.warn('[Invitation Notice]:', err.message));
+
+      return res.status(201).json({
+        message: `Collaborator ${targetUser.name} added as ${role}. Real invitation email sent to ${targetUser.email}!`,
+        member: {
+          id: membership._id,
+          user: membership.userId,
+          role: membership.role
+        }
+      });
+    } else {
+      // User is not yet registered: generate a direct share link and email them
+      const rawToken = ShareLink.generateRawToken();
+      const tokenHash = ShareLink.hashToken(rawToken);
+
+      const link = new ShareLink({
+        documentId: doc._id,
+        tokenHash,
+        permission: role,
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+        createdBy: req.user._id
+      });
+      await link.save();
+
+      const shareUrl = `${clientUrl}/share/${rawToken}`;
+      sendDocumentInvitationEmail({
+        toEmail: normalizedEmail,
+        inviterName,
+        inviterEmail,
+        documentTitle,
+        role,
+        shareUrl
+      }).catch((err) => console.warn('[Invitation Notice]:', err.message));
+
+      return res.status(201).json({
+        message: `Invitation email sent to ${normalizedEmail} with ${role} permissions!`,
+        invitedEmail: normalizedEmail,
+        role,
+        shareUrl
+      });
+    }
   } catch (err) {
     next(err);
   }

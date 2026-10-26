@@ -4,6 +4,7 @@ import { createApp } from './app.js';
 import { connectDB, disconnectDB } from './config/db.js';
 import { initRedis } from './config/redis.js';
 import { setupCollaborationServer, roomManager } from './collaboration/server.js';
+import { verifySMTP } from './services/emailService.js';
 
 dotenv.config();
 
@@ -16,6 +17,9 @@ async function bootstrap() {
 
     // 2. Initialize Redis (with resilient fallback)
     await initRedis();
+
+    // 3. Verify SMTP Email Gateway
+    await verifySMTP();
 
     // 3. Create HTTP & Collaboration Servers
     const app = createApp();

@@ -1,5 +1,6 @@
 import { User } from '../models/User.js';
 import { signToken } from '../middleware/auth.js';
+import { sendWelcomeEmail } from '../services/emailService.js';
 
 export async function register(req, res, next) {
   try {
@@ -13,7 +14,12 @@ export async function register(req, res, next) {
       return res.status(400).json({ error: 'Password must be at least 6 characters long.' });
     }
 
+    const emailRegex = /^\S+@\S+\.\S+$/;
     const normalizedEmail = email.toLowerCase().trim();
+    if (!emailRegex.test(normalizedEmail)) {
+      return res.status(400).json({ error: 'Please enter a valid email address.' });
+    }
+
     const existing = await User.findOne({ email: normalizedEmail });
     if (existing) {
       return res.status(409).json({ error: 'An account with this email address already exists.' });
@@ -28,6 +34,11 @@ export async function register(req, res, next) {
 
     await user.save();
     const token = signToken(user);
+
+    // Asynchronously dispatch real Welcome Email via SMTP
+    sendWelcomeEmail(user.email, user.name).catch((err) => {
+      console.warn('[Welcome Email] Non-blocking dispatch notice:', err.message);
+    });
 
     return res.status(201).json({
       message: 'User registered successfully.',

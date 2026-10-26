@@ -9,6 +9,7 @@
     "dev": "nodemon src/index.js",
     "test": "vitest run",
     "seed": "node src/scripts/seed.js",
+    "clean": "node src/scripts/cleanData.js",
     "test:load": "node src/scripts/loadTest.js"
   },
   "dependencies": {
@@ -23,6 +24,7 @@
     "lib0": "^0.2.99",
     "mongoose": "^8.10.1",
     "morgan": "^1.10.0",
+    "nodemailer": "^10.2.1",
     "syncforge-monorepo": "file:..",
     "ws": "^8.18.0",
     "y-protocols": "^1.0.6",

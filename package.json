@@ -14,7 +14,8 @@
     "test": "npm run test --prefix server",
     "test:e2e": "node server/src/scripts/e2eVerify.js",
     "test:load": "node server/src/scripts/loadTest.js",
-    "seed": "npm run seed --prefix server"
+    "seed": "npm run seed --prefix server",
+    "clean": "npm run clean --prefix server"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

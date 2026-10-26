@@ -44,8 +44,8 @@ export function ShareModal({
     setIsSubmitting(true);
 
     try {
-      await api.documents.addMember(document._id, inviteEmail.trim(), inviteRole);
-      setSuccess(`Invited ${inviteEmail} as ${inviteRole}!`);
+      const res = await api.documents.addMember(document._id, inviteEmail.trim(), inviteRole);
+      setSuccess(res?.message || `Invited ${inviteEmail} as ${inviteRole}!`);
       setInviteEmail('');
       if (onMembersUpdated) onMembersUpdated();
     } catch (err) {
